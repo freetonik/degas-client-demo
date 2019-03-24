@@ -20,6 +20,7 @@
 (def socket (ws/create "ws://localhost:3450" handlers))
 
 (ws/send socket [[1] [2] [3]] fmt/edn)
+(ws/send socket {:name "Jasds"} fmt/edn)
 
 (ws/close socket)
 
