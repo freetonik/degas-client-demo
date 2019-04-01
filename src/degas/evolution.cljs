@@ -1,25 +1,32 @@
 (ns degas.evolution
   (:require [degas.helpers :as h]
-            [degas.selection :as s ]))
+            [degas.mutation :as m]
+            [degas.selection :as s]))
 
-(defn next-generation-old [population fitness-fn selection-fn selection-prob crossover-fn mutation-fn]
-  "Returns a new population."
-  (selection-fn population selection-prob fitness-fn)
-  )
+;; (defn next-generation-old [population fitness-fn selection-fn selection-prob crossover-fn mutation-fn]
+;;   "Returns a new population."
+;;   (selection-fn population selection-prob fitness-fn)
+;;   )
 
 
 (defn next-generation
-  [pop fitness-fn selection-fn crossovers-map mutations-map elitism-ratio]
+  [pop fitness-fn selections-map crossovers-map mutations-map mutation-ratio elitism-ratio]
   (let [
-        popsize       (count pop)
-        crossover-fn  (h/weighted-rand-choice crossovers-map)
-        mutation-fn   (h/weighted-rand-choice mutations-map)
-        elite-count   (Math/floor (* elitism-ratio popsize))
-        newpop        (s/top-n pop elite-count fitness-fn)
+        popsize         (count pop)
+        elite-count     (Math/floor (* elitism-ratio popsize))
         offspring-count (- popsize elite-count)
-        breedable-pop (into [] (take-last offspring-count pop))
+
+        selection-fn    (h/weighted-rand-choice selections-map)
+        crossover-fn    (h/weighted-rand-choice crossovers-map)
+
+        sorted-pop      (vec (sort-by fitness-fn pop))
+        elite-pop       (vec (take elite-count sorted-pop))
+
+        breedable-pop   (m/mutate-pop (take-last offspring-count sorted-pop)
+                                      mutations-map
+                                      mutation-ratio)
         ]
 
-    (into newpop (repeatedly offspring-count
-                             #(apply crossover-fn
-                                     (selection-fn breedable-pop fitness-fn))))))
+    (into elite-pop (repeatedly offspring-count
+                                #(apply crossover-fn
+                                        (selection-fn breedable-pop fitness-fn))))))

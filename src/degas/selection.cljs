@@ -39,7 +39,8 @@
              count
              range
              shuffle
-             ;; here we add padding to partition in case of odd size
+             ;; add padding to partition in case of odd size
+             ;;              ↓
              (partition 2 2 [(rand-int (count pop))]))]
     (mapv
      (fn [pair]

@@ -46,8 +46,17 @@
         length (rand-int (- (count a) point))]
     (crossover-ordered a b point length))))
 
+(defn crossover-interleave [a b]
+  "Interleave two individuals with padding."
+  (let [length (count a)]
+    (take length
+          (conj
+           (vec (interleave
+                 (take-nth 2 a)
+                 (take-nth 2 (rest b))))
+           (last a)))))
+
 ;; ----
 ;; TODO
-;; (defn crossover-interleave [a b length])
 ;; (defn crossover-2point-split [a b p1 p2])
 ;; crossover with two children?

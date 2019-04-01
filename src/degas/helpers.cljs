@@ -16,8 +16,16 @@
 
 (defn shift [v n]
   (let [distance (mod n (count v))]
-    (concat (subvec v distance) (subvec v 0 distance))))
+    (into []
+          (concat (subvec v distance) (subvec v 0 distance)))))
 
+(defn pathify [vec]
+  "Turns a vector into a vector of transitions,
+   including last element back to the first
+   ex: [0 1 2] -> [[0 1] [1 2] [2 0]]"
+  (map (fn [i]
+           (subvec (into vec vec) i (+ 2 i)))
+       (range (count vec))))
 
 ;; -------
 ;; Making choices
