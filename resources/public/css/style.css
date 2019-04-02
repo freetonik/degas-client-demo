@@ -1,2 +1,11 @@
-/* some style */
+body {
+  height: 100%
+}
 
+.online {
+  border-top: 5px solid green;
+}
+
+.offline {
+  border-top: 5px solid orange;
+}
