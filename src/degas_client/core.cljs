@@ -33,11 +33,11 @@
 (defonce population (atom []))
 (defonce current-best (atom (first @population)))
 (defonce best (atom (first @population)))
-(defonce mutation-rate (/ (rand-int 40) 100))
-(defonce elitism-rate (/ (rand-int 8) 100))
+(defonce mutation-rate (atom (/ (rand-int 40) 100)))
+(defonce elitism-rate (atom (/ (rand-int 8) 100)))
 
 (defonce selections-map (atom { s/tournament-selection 1, s/random-selection 1 }))
-(defonce mutations-map (atom { m/mut-swap 1, m/mut-shift 1}))
+(defonce mutations-map (atom { m/mut-swap 1, m/mut-shift 1, m/mut-reverse 1}))
 
 ;; Async state
 (defonce running? (atom false))
@@ -155,20 +155,44 @@
                   (str (first x) " " (Math/abs (second x)))])
                (filter #(not= (first %) nil) (h/sort-by-value-desc @ratings))))])
 
+(defn render-prob-map-item [pmap-atom, func, name]
+  (let [prob (@pmap-atom func)]
+    [:div
+     [:span name " " prob]
+     (render-slider prob
+                    0 100
+                    (fn [e]
+                      (swap! pmap-atom assoc func (int (.. e -target -value)))
+                      ))]))
+
 (defn render-control-panel []
   [:div.card
    [:div.card-header "God mode"]
    [:div.card-body
     [:div.row
-
-     [:div.col
-      [:span "Mutation rate " (Math/floor (* 100 @mutation-rate)) "%"]
-      [render-mutation-rate-slider]]
-
      [:div.col
       [:span "Elitism rate " (Math/floor (* 100 @elitism-rate)) "%"]
       [render-elitism-rate-slider]]]
 
+
+    [:div.row
+
+     [:div.col
+      [:h5.mt-4.mb-3 "Mutation"]
+      [:span "Mutation rate " (Math/floor (* 100 @mutation-rate)) "%"]
+      [render-mutation-rate-slider]
+      [:h6.mt-4.mb-3 "Types of mutation"]
+      [render-prob-map-item mutations-map m/mut-swap "Random swap"]
+      [render-prob-map-item mutations-map m/mut-shift "Random shift"]
+      [render-prob-map-item mutations-map m/mut-reverse "Reverse genome"]
+      ]
+
+     [:div.col
+      [:h5.mt-4.mb-3 "Selection"]
+      [render-prob-map-item selections-map s/tournament-selection "Tournament selection"]
+      [render-prob-map-item selections-map s/random-selection "Random selection"]
+      ]
+     ]
 
      ]]
   )
