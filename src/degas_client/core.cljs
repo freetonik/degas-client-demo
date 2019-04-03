@@ -4,7 +4,9 @@
             [wscljs.format :as fmt]
             [clojure.core.async :refer [>! <! go chan timeout]]
             [cljs.reader :refer [read-string]]
-            [degas-client.tsm :refer [distances get-distance fitness-tsm]]
+            [degas-client.tsm :refer [distances cities get-distance fitness-tsm]]
+            [degas-client.views :as v]
+            [degas-client.drawing :as dr]
             [degas.individual :as i]
             [degas.crossover :as c]
             [degas.mutation :as m]
@@ -12,19 +14,22 @@
             [degas.selection :as s]
             [degas.evolution :as e]
             [degas.fitness :as f]
-            [degas.helpers :as h]))
+            [degas.helpers :as h]
+            [devtools.defaults :as d]))
 
 (enable-console-print!)
 
 (declare comm-handlers)
 (declare send-message)
 (declare socket)
+(declare ctx)
 (def server-addr "ws://localhost:3449")
 
-(def popsize   30)
+(def popsize   20)
 (def indlength 50)
 
 ;; State
+(defonce admin? (atom false))
 (defonce online? (atom false))
 (defonce authenticated? (atom false))
 (defonce ratings (atom {}))
@@ -65,27 +70,23 @@
 
 (defn run-async []
   (reset! running? true)
-  ;; (reset! running? false)
 
   (go (while @running?
         (>! queue @generation)
-        (<! (timeout 100))))
-  ;; (go (>! queue @generation))
+        (<! (timeout 500))))
 
   (go (while true
         (let [item (<! queue)]
           (evolve-step)
           (reset! current-best (first @population))
           (update-best)
-          (swap! generation inc))))
-  )
-
-;; (run-async)
-;; (stop-async)
+          (dr/clear-canvas ctx 620 740)
+          (doall (map #(dr/draw-city ctx (first %) (second %)) cities))
+          (dr/draw-pahts ctx cities (h/pathify @current-best))
+          (swap! generation inc)))))
 
 ;; Upload
-(defn upload-best [ind sock]
-  (send-message {:best ind} sock))
+(defn upload-best [ind sock] (send-message {:best ind} sock))
 
 (defn run-upload-async [sock]
   (go (while @running?
@@ -102,12 +103,9 @@
 
 (defn handle-message [m sock]
   (cond
-    (:start m) (if-not @running? (do (run-async)
-                                     (run-upload-async sock)))
-    (:stop m)  (if @running?    (stop-async))
-
-    (:update m) (reset! ratings (:update m))
-    ))
+    (:start m)  (if-not @running? (do (run-async) (run-upload-async sock)))
+    (:stop m)   (if @running? (stop-async))
+    (:update m) (reset! ratings (:update m))))
 
 (def comm-handlers {:on-message #(handle-message (read-string (.-data %)) socket)
                     :on-open    #(reset! online? true)
@@ -116,149 +114,85 @@
 
 ;; ---------------
 ;; View components
-(defn render-run-button []
-  (if @running?
-    [:button.btn.btn-success.mr-3 {:on-click stop-async} "Pause"]
-    [:button.btn.btn-success.mr-3 {:on-click run-async} "Run"]))
-
-(defn render-slider [value min max callback]
-  [:input {:type "range" :value value :min min :max max
-           :style {:width "100%"}
-           :on-change callback}])
-
-(defn render-name-input []
-  [:div
-   [:input {:type "text"
-            :value @username
-            :on-change #(reset! username (-> % .-target .-value))}]
-   [:input {:type "button" :value "Enroll!"
-            :class "btn btn-success"
-            :on-click (fn []
-                        (reset! authenticated? true)
-                        (send-message {:name @username} socket))}]])
 
 (defn update-mutation-rate [e]
   (reset! mutation-rate (/ (int (.. e -target -value)) 100)))
 (defn render-mutation-rate-slider []
-  (render-slider (* 100 @mutation-rate) 0 100 update-mutation-rate))
+  (v/render-slider (* 100 @mutation-rate) 0 100 update-mutation-rate))
 
 (defn update-elitism-rate [e]
   (reset! elitism-rate (/ (int (.. e -target -value)) 100)))
 (defn render-elitism-rate-slider []
-  (render-slider (* 100 @elitism-rate) 0 100 update-elitism-rate))
+  (v/render-slider (* 100 @elitism-rate) 0 100 update-elitism-rate))
 
-(defn render-ratings [r]
-  [:ol.pl-3.ml-1
-   (doall (map (fn [x]
-                 ^{:key (first x)}
-                 [:li {:class (if (= (first x) @username) "font-weight-bold" "")}
-                  (str (first x) " " (Math/abs (second x)))])
-               (filter #(not= (first %) nil) (h/sort-by-value-desc @ratings))))])
 
 (defn render-prob-map-item [pmap-atom, func, name]
   (let [prob (@pmap-atom func)]
     [:div
      [:span name " " prob]
-     (render-slider prob
-                    0 100
-                    (fn [e]
-                      (swap! pmap-atom assoc func (int (.. e -target -value)))
-                      ))]))
-
-(defn render-control-panel []
-  [:div.card
-   [:div.card-header "God mode"]
-   [:div.card-body
-    [:div.row
-     [:div.col
-      [:span "Elitism rate " (Math/floor (* 100 @elitism-rate)) "%"]
-      [render-elitism-rate-slider]]]
-
-
-    [:div.row
-
-     [:div.col
-      [:h5.mt-4.mb-3 "Mutation"]
-      [:span "Mutation rate " (Math/floor (* 100 @mutation-rate)) "%"]
-      [render-mutation-rate-slider]
-      [:h6.mt-4.mb-3 "Types of mutation"]
-      [render-prob-map-item mutations-map m/mut-swap "Random swap"]
-      [render-prob-map-item mutations-map m/mut-shift "Random shift"]
-      [render-prob-map-item mutations-map m/mut-reverse "Reverse genome"]
-      ]
-
-     [:div.col
-      [:h5.mt-4.mb-3 "Selection"]
-      [render-prob-map-item selections-map s/tournament-selection "Tournament selection"]
-      [render-prob-map-item selections-map s/random-selection "Random selection"]
-      ]
-     ]
-
-     ]]
-  )
-
-(defn render-evol-status []
-  [:div.card
-   [:div.card-header "Status"]
-   [:div.card-body
-    [:div
-     [:h5 "Generation " @generation]
-
-     [:p
-      (prn-str @current-best)
-      "  --->  "
-      (prn-str (fitness-tsm @current-best))]
-
-     [:h5 "Best so far:"]
-     [:p
-      (prn-str @best)
-      "  --->  "
-      [:strong (prn-str (fitness-tsm @best))]]]]]
-  )
-
-(defn render-status-stripe [connected? computing?]
-  [:div.progress.rounded-0
-   {:style {:height "7px"}}
-   [:div.progress-bar
-    {:class (if connected?
-              (if computing? "bg-success progress-bar-animated progress-bar-striped"
-                             "bg-success")
-              "bg-warning")
-     :style {:width "100%", :height "7px"}}]])
+     (v/render-slider prob 1 100
+                    (fn [e] (swap! pmap-atom assoc func (int (.. e -target -value)))))]))
 
 (defn render-dashboard []
     [:div.row
-     [:div.col-9
-      [:h3.mb-4 "The World of " [:b @username]]
-      [render-control-panel]
-      [:div.mt-4]
-      [render-evol-status]
-      ]
+     [:div.col-7
+      [:div.card
+       [:div.card-body
+        [:span "Elitism rate " (Math/floor (* 100 @elitism-rate)) "%"]
+        [render-elitism-rate-slider]
 
-     [:div.col-3.border-left
-      [:h4.mb-3 "Global ratings"]
-      [render-ratings @ratings]
-      ]
-    ])
+        [:h5.mt-4.mb-3 "Selection"]
+        [render-prob-map-item selections-map s/tournament-selection "Tournament selection"]
+        [render-prob-map-item selections-map s/random-selection "Random selection"]
 
-(defn render-auth []
-  [:div.row.justify-content-center
-   [:div.col-4 [render-name-input]]])
+        [:h5.mt-4.mb-3 "Mutation"]
+        [:span "Mutation rate " (Math/floor (* 100 @mutation-rate)) "%"]
+        [render-mutation-rate-slider]
 
-(defn render-offline-status []
-  [:div
-   [:h3.text-center.mt-4 "Offline :'("]])
+        [:h6.mt-4.mb-3 "Types of mutation"]
+        [render-prob-map-item mutations-map m/mut-swap "Random swap"]
+        [render-prob-map-item mutations-map m/mut-shift "Random shift"]
+        [render-prob-map-item mutations-map m/mut-reverse "Reverse genome"]]]]
+
+     [:div.col-5
+
+      (if @admin?
+        [v/render-admin socket send-message])
+      [:h5.mb-3 "Rating"]
+      [:ol.pl-3
+       (doall (map (fn [x]
+                     ^{:key (first x)}
+                     [:li.small {:class (if (= (first x) @username) "font-weight-bold" "")}
+                      (str (first x) " " (Math/abs (second x)))])
+                   (filter #(not (nil? (first %))) (h/sort-by-value-desc @ratings))))]]])
 
 (defn app []
   [:div
-   [render-status-stripe @online? @running?]
+   [v/render-status-stripe @online? @running?]
 
    [:div.container-fluid.mt-3
-    (if @online?
-      (if @authenticated?
-        [render-dashboard]
-        [render-auth])
-      [render-offline-status])]])
+    [:div.row
+     [:div.col
+      [:div.evol-status
+       [:h3.mb-0
+        "Generation " @generation
+        [:br]
+        (Math/abs (fitness-tsm @current-best)) " km"
+        ]
+       [:p.small.mt-3 "Historical best: " (Math/abs (fitness-tsm @best)) " km."]]
+      [:canvas {:id "themap", :width "630", :height "720"} "Map of The Netherlands"]]
+
+     [:div.col
+      (if @online?
+        (if-not @authenticated?
+          [:div.card.mb-3
+           [:div.card-body
+            [v/render-name-input username admin? authenticated? socket send-message]]])
+        [:h3.text-center.my-4 "Offline :'("])
+
+      [render-dashboard]
+
+     ]]]])
 
 ;; Reagent stuff
 (reagent/render-component [app] (. js/document (getElementById "app")))
@@ -286,3 +220,12 @@
 (reset! best (first @population))
 (reset! current-best (first @population))
 (reset! generation 0)
+
+(def canvas (.getElementById js/document "themap"))
+(def ctx (.getContext canvas "2d"))
+(set! (.-fillStyle ctx) "navy")
+(.transform ctx 1, 0, 0, -1, 0, 720)
+
+
+(doall (map #(dr/draw-city ctx (first %) (second %)) cities))
+(dr/draw-pahts ctx cities (h/pathify @current-best))

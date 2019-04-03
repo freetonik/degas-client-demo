@@ -27,6 +27,19 @@
   (crossover-split a b 0.25))
 
 
+;;
+;;
+
+(defn crossover-interleave [a b]
+  "Interleave two individuals with padding."
+  (let [length (count a)]
+    (take length
+          (conj
+           (vec (interleave
+                 (take-nth 2 a)
+                 (take-nth 2 (rest b))))
+           (last a)))))
+
 ;; -----------
 ;; Specialized
 
@@ -45,16 +58,6 @@
         point (rand-int (count a))
         length (rand-int (- (count a) point))]
     (crossover-ordered a b point length))))
-
-(defn crossover-interleave [a b]
-  "Interleave two individuals with padding."
-  (let [length (count a)]
-    (take length
-          (conj
-           (vec (interleave
-                 (take-nth 2 a)
-                 (take-nth 2 (rest b))))
-           (last a)))))
 
 ;; ----
 ;; TODO

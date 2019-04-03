@@ -2,10 +2,24 @@ body {
   height: 100%
 }
 
+.evol-status {
+  position: absolute;
+}
+
+.evol-status h3 {
+  background-color: #ffffffc7;
+}
+
 .online {
   border-top: 5px solid green;
 }
 
 .offline {
   border-top: 5px solid orange;
+}
+
+#themap {
+  margin-top: 10px;
+  background-image: url("https://i.imgur.com/1WOEjda.gif");
+  background-size: cover;
 }
