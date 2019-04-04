@@ -44,17 +44,13 @@
   [:div.card.mb-4
    [:div.card-body.d-flex.flex-row.justify-content-between
     [:input {:type "button" :value "GO"
-                  :class "btn btn-success btn-sm"
+                  :class "btn btn-success"
                   :on-click (fn []
                               (send-fn {:admin-start true} socket))}]
     [:input {:type "button" :value "STOP"
-                  :class "btn btn-warning btn-sm"
+                  :class "btn btn-warning"
                   :on-click (fn []
-                              (send-fn {:admin-stop true} socket))}]
-    [:input {:type "button" :value "X"
-                  :class "btn btn-danger btn-sm"
-                  :on-click (fn []
-                              (send-fn {:admin-reset true} socket))}]]])
+                              (send-fn {:admin-stop true} socket))}]]])
 
 (defn render-server-addr-input [value]
   [:input {:type "text"

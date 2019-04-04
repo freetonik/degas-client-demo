@@ -24,7 +24,7 @@
 (declare socket)
 (declare ctx)
 ;; (defonce server-addr (atom "ws://localhost:5000"))
-(defonce server-addr (atom "ws://aqueous-plains-54322.herokuapp.com"))
+(defonce server-addr (atom "wss://aqueous-plains-54322.herokuapp.com"))
 
 (def popsize   20)
 (def indlength 50)
@@ -39,11 +39,12 @@
 (defonce population (atom []))
 (defonce current-best (atom (first @population)))
 (defonce best (atom (first @population)))
-(defonce mutation-rate (atom (/ (rand-int 40) 100)))
+(defonce mutation-rate (atom (/ (rand-int 30) 100)))
 (defonce elitism-rate (atom (/ (rand-int 8) 100)))
 
-(defonce selections-map (atom { s/tournament-selection 1, s/random-selection 1 }))
+(defonce selections-map (atom { s/tournament-selection 20, s/random-selection 5 }))
 (defonce mutations-map (atom { m/mut-swap 1, m/mut-shift 1, m/mut-reverse 1}))
+(defonce crossovers-map (atom { c/crossover-ordered 1 }))
 
 ;; Async state
 (defonce running? (atom false))
@@ -51,7 +52,7 @@
 (def upload-queue (chan 10))
 
 ;; Evolution
-(defn update-best []
+(defn update-best [current-best best]
   (if (> (fitness-tsm @current-best) (fitness-tsm @best))
     (reset! best @current-best)))
 
@@ -61,7 +62,7 @@
                    (e/next-generation @population
                                       fitness-tsm
                                       @selections-map
-                                      { c/crossover-ordered 1 }
+                                      @crossovers-map
                                       @mutations-map
                                       @mutation-rate
                                       @elitism-rate))))
@@ -80,14 +81,13 @@
         (let [item (<! queue)]
           (evolve-step)
           (reset! current-best (first @population))
-          (update-best)
+          (update-best current-best best)
           (dr/clear-canvas ctx 620 740)
           (doall (map #(dr/draw-city ctx (first %) (second %)) cities))
           (dr/draw-pahts ctx cities (h/pathify @current-best))
           (swap! generation inc)))))
 
 ;; Upload
-
 (defn run-upload-async [sock]
   (go (while @running?
         (>! upload-queue @generation)
@@ -95,8 +95,7 @@
 
   (go (while true
         (let [item (<! upload-queue)]
-          (send-message {:best @current-best} sock)
-          ))))
+          (send-message {:best @current-best} sock)))))
 
 ;; Communication
 (defn send-message [m sock] (ws/send sock m fmt/edn))
@@ -124,7 +123,6 @@
   (reset! elitism-rate (/ (int (.. e -target -value)) 100)))
 (defn render-elitism-rate-slider []
   (v/render-slider (* 100 @elitism-rate) 0 100 update-elitism-rate))
-
 
 (defn render-prob-map-item [pmap-atom, func, name]
   (let [prob (@pmap-atom func)]
@@ -155,7 +153,6 @@
         [render-prob-map-item mutations-map m/mut-reverse "Reverse genome"]]]]
 
      [:div.col-5
-
       (if @admin?
         [v/render-admin socket send-message])
       [:h5.mb-3 "Rating"]
@@ -170,7 +167,7 @@
   [:div
    [v/render-status-stripe @online? @running?]
 
-   [:div.container-fluid.mt-3
+   [:div.container-fluid.container-degas..mt-3
     [:div.row
      [:div.col.pr-0
       [:div.evol-status
