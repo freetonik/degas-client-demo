@@ -20,30 +20,43 @@
            :style {:width "100%"} :on-change callback}])
 
 (defn render-name-input [username admin authenticated? socket send-fn]
-  [:div.text-center
-   [:p "Enter your name"]
-   [:input {:type "text"
-            :value @username
-            :on-change #(reset! username (-> % .-target .-value))}]
-   [:br]
-   [:input.mt-3 {:type "button" :value "Join the contest"
-            :class "btn btn-success"
-            :on-click (fn []
-                        (reset! authenticated? true)
-                        (if (= @username "admin")
-                          (reset! admin true)
-                          (send-fn {:name @username} socket)
-                          )
-                        )}]])
+  [:form
+   {:on-submit (fn [e]
+                 (.preventDefault e)
+                 (reset! authenticated? true)
+                 (if (= @username "vn3iguajdjitvnaohgioax")
+                   (reset! admin true)
+                   (send-fn {:name @username} socket)
+                   ))}
+
+   [:div.form-group.mb-0
+    [:label "Your name"]
+    [:input {:type "text"
+             :class "form-control"
+             :value @username
+             :on-change #(reset! username (-> % .-target .-value))}]
+    [:button {:type "submit"
+              :class "btn btn-primary mt-3"}
+     "Join the contest"
+     ]]])
 
 (defn render-admin [socket send-fn]
   [:div.card.mb-4
    [:div.card-body.d-flex.flex-row.justify-content-between
     [:input {:type "button" :value "GO"
-                  :class "btn btn-success"
+                  :class "btn btn-success btn-sm"
                   :on-click (fn []
                               (send-fn {:admin-start true} socket))}]
     [:input {:type "button" :value "STOP"
-                  :class "btn btn-warning"
+                  :class "btn btn-warning btn-sm"
                   :on-click (fn []
-                              (send-fn {:admin-stop true} socket))}]]])
+                              (send-fn {:admin-stop true} socket))}]
+    [:input {:type "button" :value "X"
+                  :class "btn btn-danger btn-sm"
+                  :on-click (fn []
+                              (send-fn {:admin-reset true} socket))}]]])
+
+(defn render-server-addr-input [value]
+  [:input {:type "text"
+           :value @value
+           :on-change #(reset! value (-> % .-target .-value))}])

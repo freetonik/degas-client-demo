@@ -23,7 +23,8 @@
 (declare send-message)
 (declare socket)
 (declare ctx)
-(def server-addr "ws://localhost:3449")
+;; (defonce server-addr (atom "ws://localhost:5000"))
+(defonce server-addr (atom "ws://aqueous-plains-54322.herokuapp.com"))
 
 (def popsize   20)
 (def indlength 50)
@@ -86,7 +87,6 @@
           (swap! generation inc)))))
 
 ;; Upload
-(defn upload-best [ind sock] (send-message {:best ind} sock))
 
 (defn run-upload-async [sock]
   (go (while @running?
@@ -95,7 +95,7 @@
 
   (go (while true
         (let [item (<! upload-queue)]
-          (upload-best @best sock)
+          (send-message {:best @current-best} sock)
           ))))
 
 ;; Communication
@@ -110,7 +110,7 @@
 (def comm-handlers {:on-message #(handle-message (read-string (.-data %)) socket)
                     :on-open    #(reset! online? true)
                     :on-close   #(reset! online? false)})
-(def socket (ws/create server-addr comm-handlers))
+(def socket (ws/create @server-addr comm-handlers))
 
 ;; ---------------
 ;; View components
@@ -172,27 +172,27 @@
 
    [:div.container-fluid.mt-3
     [:div.row
-     [:div.col
+     [:div.col.pr-0
       [:div.evol-status
        [:h3.mb-0
         "Generation " @generation
         [:br]
         (Math/abs (fitness-tsm @current-best)) " km"
         ]
-       [:p.small.mt-3 "Historical best: " (Math/abs (fitness-tsm @best)) " km."]]
-      [:canvas {:id "themap", :width "630", :height "720"} "Map of The Netherlands"]]
+       [:div.small.mt-3 "Historical best: " (Math/abs (fitness-tsm @best)) " km."]]
+      [:canvas {:id "themap", :width "630", :height "720"
+                :class (if (> @elitism-rate 0.9) "elited")
+                } "Map of The Netherlands"]]
 
      [:div.col
       (if @online?
         (if-not @authenticated?
-          [:div.card.mb-3
+          [:div.card.mb-3.bg-light
            [:div.card-body
             [v/render-name-input username admin? authenticated? socket send-message]]])
         [:h3.text-center.my-4 "Offline :'("])
 
-      [render-dashboard]
-
-     ]]]])
+      [render-dashboard]]]]])
 
 ;; Reagent stuff
 (reagent/render-component [app] (. js/document (getElementById "app")))
@@ -214,18 +214,16 @@
   (reset! generation 0))
 
 ;; (reset-state!)
-
-
 (randomize-population!)
 (reset! best (first @population))
 (reset! current-best (first @population))
 (reset! generation 0)
 
+;; Canvas
 (def canvas (.getElementById js/document "themap"))
 (def ctx (.getContext canvas "2d"))
 (set! (.-fillStyle ctx) "navy")
 (.transform ctx 1, 0, 0, -1, 0, 720)
-
 
 (doall (map #(dr/draw-city ctx (first %) (second %)) cities))
 (dr/draw-pahts ctx cities (h/pathify @current-best))
