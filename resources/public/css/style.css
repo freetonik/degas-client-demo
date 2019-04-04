@@ -2,6 +2,10 @@ body {
   height: 100%
 }
 
+.container-degas {
+  max-width: 1220px;
+}
+
 .evol-status {
   position: absolute;
 }
@@ -20,6 +24,10 @@ body {
 
 #themap {
   margin-top: 10px;
-  background-image: url("https://i.imgur.com/1WOEjda.gif");
+  background-image: url("/img/nl.png");
   background-size: cover;
+}
+
+.elited {
+  background-image: url("/img/nl.png"), url("/img/haskell.gif") !important;
 }
