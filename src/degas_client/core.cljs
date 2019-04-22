@@ -109,7 +109,7 @@
 (def comm-handlers {:on-message #(handle-message (read-string (.-data %)) socket)
                     :on-open    #(reset! online? true)
                     :on-close   #(reset! online? false)})
-(def socket (ws/create @server-addr comm-handlers))
+;; (def socket (ws/create @server-addr comm-handlers))
 
 ;; ---------------
 ;; View components
@@ -153,9 +153,20 @@
         [render-prob-map-item mutations-map m/mut-reverse "Reverse genome"]]]]
 
      [:div.col-5
+
+      [:div.card.mb-4
+       [:div.card-body.d-flex.flex-row.justify-content-between
+        [:input {:type "button" :value "Start"
+                 :class "btn btn-success"
+                 :on-click run-async}]
+        [:input {:type "button" :value "Pause"
+                 :class "btn btn-warning"
+                 :on-click stop-async}]]]
+
+
       (if @admin?
         [v/render-admin socket send-message])
-      [:h5.mb-3 "Rating"]
+      ;; [:h5.mb-3 "Rating"]
       [:ol.pl-3
        (doall (map (fn [x]
                      ^{:key (first x)}
@@ -182,12 +193,12 @@
                 } "Map of The Netherlands"]]
 
      [:div.col
-      (if @online?
-        (if-not @authenticated?
-          [:div.card.mb-3.bg-light
-           [:div.card-body
-            [v/render-name-input username admin? authenticated? socket send-message]]])
-        [:h3.text-center.my-4 "Offline :'("])
+      (if-not @online?
+        ;; (if-not @authenticated?
+        ;;   [:div.card.mb-3.bg-light
+        ;;    [:div.card-body
+        ;;     [v/render-name-input username admin? authenticated? socket send-message]]])
+        [:h5.text-center.my-4 "This is a client-only demo without server interaction."])
 
       [render-dashboard]]]]])
 
